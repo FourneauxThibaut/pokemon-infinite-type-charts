@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.42.0",
     "axios": "^1.5.1",
     "oh-vue-icons": "^1.0.0-rc3",
     "pinia": "^2.1.6",
