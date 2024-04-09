@@ -39,6 +39,14 @@
                         <td>{{ strengths.find(s => s.typeId === defType.id)?.count || '0' }}</td>
                     </tr>
                 </tbody>
+                <tfoot>
+                    <tr>
+                        <th>DEF \ ATK</th>
+                        <th v-for="atkType in types" :key="`atk-${atkType.id}`">{{ atkType.name.slice(0, 3) }}</th>
+                        <th>-</th>
+                        <th>+</th> 
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -64,6 +72,18 @@
                     </td>
                 </tr>
             </tbody>
+            <tfoot>
+                <tr>
+                    <td> Total </td>
+                    <td v-for="atkType in types" :key="`type-match-${atkType.id}`" :style="getCellStyle(displayGroupTypeMatch(atkType.id))">
+                        {{ displayGroupTypeMatch(atkType.id).display }}
+                    </td>
+                </tr>
+                <tr>
+                    <th>POKE \ ATK</th>
+                    <th v-for="atkType in types" :key="`atk-${atkType.id}`">{{ atkType.name.slice(0, 3) }}</th>
+                </tr>
+            </tfoot>
         </table>
     </div>
 
@@ -326,24 +346,55 @@ const createPokemon = async () => {
 
 const displayTypeMatch = (firstTypeId, secondTypeId, attackingTypeId, levitate = false) => {
     let firstTypeMultiplier = findMultiplier(attackingTypeId, firstTypeId);
-    let secondTypeMultiplier = secondTypeId ? findMultiplier(attackingTypeId, secondTypeId) : 1; // Assume neutral if no second type
+    let secondTypeMultiplier = secondTypeId ? findMultiplier(attackingTypeId, secondTypeId) : 1;
 
-    // Correctly calculate the combined multiplier
     let combinedMultiplier = firstTypeMultiplier * secondTypeMultiplier;
 
-    // Handling immunity or other specific rules if needed
     if (firstTypeMultiplier === 0 || secondTypeMultiplier === 0) {
-        combinedMultiplier = 0; // Immune
+        combinedMultiplier = 0;
     }
 
     if (levitate != false && attackingTypeId === 9) {
         combinedMultiplier = 0;
     }
 
-    // Return the calculated combinedMultiplier as part of an object
-    // This matches what getCellStyle expects
     return { value: combinedMultiplier, display: formatMultiplier(combinedMultiplier) };
 };
+
+const displayGroupTypeMatch = (atkTypeId) => {
+    let pokemonsTypeMatch = filteredPokemon.value.map(pokemon => {
+        let firstTypeMultiplier = findMultiplier(atkTypeId, pokemon.firstTypeId);
+        let secondTypeMultiplier = pokemon.secondTypeId ? findMultiplier(atkTypeId, pokemon.secondTypeId) : 1;
+
+        let combinedMultiplier = firstTypeMultiplier * secondTypeMultiplier;
+
+        // Apply levitate rule, making the Pokémon immune to Ground-type attacks (assuming atkTypeId 9 is Ground)
+        if (pokemon.levitate && atkTypeId === 9) {
+            combinedMultiplier = 0;
+        }
+
+        return combinedMultiplier;
+    });
+
+    // Handling special case where any multiplier is 0 (immunity)
+    if (pokemonsTypeMatch.includes(0)) {
+        return { value: 0, display: '0' }; // Return as soon as any immunity is detected
+    }
+
+    // Finding the minimum and maximum multiplier values
+    let lowestValue = Math.min(...pokemonsTypeMatch);
+    let highestValue = Math.max(...pokemonsTypeMatch);
+
+    // Determining what to display based on the lowest and highest values
+    if (lowestValue === 1) {
+        // If the lowest is 1, and there's a value higher than 1, it indicates a strength, otherwise, it's neutral
+        return highestValue > 1 ? { value: highestValue, display: formatMultiplier(highestValue) } : { value: 1, display: '' };
+    } else {
+        // For values less than 1, indicating a weakness or special condition
+        return { value: lowestValue, display: formatMultiplier(lowestValue) };
+    }
+}
+
 
 const getTypeIdName = (typeId) => {
     return types.value.find(t => t.id === typeId)?.name || 'None';
@@ -393,8 +444,9 @@ const confirmDelete = async () => {
 
 <style>
 .type-effectiveness-table table {
-  width: 100%;
-  border-collapse: collapse;
+    margin-bottom: 2rem;
+    width: 100%;
+    border-collapse: collapse;
 }
 
 .type-effectiveness-table th,
